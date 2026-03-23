@@ -22,25 +22,28 @@ fn ui_panel(mut contexts: EguiContexts, mut params: ResMut<TerrainParams>) {
             ui.separator();
 
             ui.label("technique");
-            let mut changed = false;
+            let mut regenerate = false;
 
             if ui.radio_value(&mut params.technique, Technique::Gradient, "gradient trick").changed() {
-                changed = true;
+                regenerate = true;
             }
             if ui.radio_value(&mut params.technique, Technique::Dla, "DLA").changed() {
-                changed = true;
+                regenerate = true;
             }
 
             ui.separator();
             ui.label("seed");
             let mut seed_i32 = params.seed as i32;
-            if ui.add(bevy_egui::egui::DragValue::new(&mut seed_i32).range(0..=999999)).changed() {
+            let seed_resp = ui.add(bevy_egui::egui::DragValue::new(&mut seed_i32).range(0..=999999));
+            if seed_resp.changed() {
                 params.seed = seed_i32.max(0) as u32;
-                changed = true;
+            }
+            if seed_resp.drag_stopped() || seed_resp.lost_focus() {
+                regenerate = true;
             }
             if ui.button("randomize").clicked() {
                 params.seed = rand::random::<u32>() % 999999;
-                changed = true;
+                regenerate = true;
             }
 
             ui.separator();
@@ -49,34 +52,51 @@ fn ui_panel(mut contexts: EguiContexts, mut params: ResMut<TerrainParams>) {
                 Technique::Gradient => {
                     ui.label("octaves");
                     let mut octaves_i32 = params.octaves as i32;
-                    if ui.add(bevy_egui::egui::Slider::new(&mut octaves_i32, 1..=10)).changed() {
+                    let resp = ui.add(bevy_egui::egui::Slider::new(&mut octaves_i32, 1..=10));
+                    if resp.changed() {
                         params.octaves = octaves_i32 as usize;
-                        changed = true;
+                    }
+                    if resp.drag_stopped() {
+                        regenerate = true;
                     }
 
                     ui.label("gradient falloff");
-                    if ui.add(bevy_egui::egui::Slider::new(&mut params.gradient_falloff, 0.0..=5.0)).changed() {
-                        changed = true;
+                    let resp = ui.add(bevy_egui::egui::Slider::new(&mut params.gradient_falloff, 0.0..=5.0));
+                    if resp.drag_stopped() {
+                        regenerate = true;
                     }
                 }
                 Technique::Dla => {
                     ui.label("walkers");
                     let mut walkers_i32 = params.dla_walkers as i32;
-                    if ui.add(bevy_egui::egui::Slider::new(&mut walkers_i32, 500..=20000)).changed() {
+                    let resp = ui.add(bevy_egui::egui::Slider::new(&mut walkers_i32, 500..=20000));
+                    if resp.changed() {
                         params.dla_walkers = walkers_i32 as usize;
-                        changed = true;
+                    }
+                    if resp.drag_stopped() {
+                        regenerate = true;
                     }
 
                     ui.label("blur passes");
                     let mut blur_i32 = params.blur_passes as i32;
-                    if ui.add(bevy_egui::egui::Slider::new(&mut blur_i32, 0..=20)).changed() {
+                    let resp = ui.add(bevy_egui::egui::Slider::new(&mut blur_i32, 0..=20));
+                    if resp.changed() {
                         params.blur_passes = blur_i32 as usize;
-                        changed = true;
+                    }
+                    if resp.drag_stopped() {
+                        regenerate = true;
                     }
                 }
             }
 
-            if changed {
+            ui.separator();
+            ui.label("height");
+            let resp = ui.add(bevy_egui::egui::Slider::new(&mut params.height_scale, 0.1..=3.0));
+            if resp.drag_stopped() {
+                regenerate = true;
+            }
+
+            if regenerate {
                 params.dirty = true;
             }
         });

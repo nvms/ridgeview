@@ -72,7 +72,7 @@ fn regenerate_terrain(
         }
     };
 
-    let mesh = build_terrain_mesh(&heightmap);
+    let mesh = build_terrain_mesh(&heightmap, params.height_scale);
 
     commands.spawn((
         Mesh3d(meshes.add(mesh)),

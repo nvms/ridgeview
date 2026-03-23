@@ -3,7 +3,7 @@ use bevy::render::mesh::{Indices, PrimitiveTopology};
 
 use super::Heightmap;
 
-const HEIGHT_SCALE: f32 = 30.0;
+const BASE_HEIGHT: f32 = 30.0;
 const TERRAIN_SCALE: f32 = 1.0;
 
 fn height_color(height: f32, slope: f32) -> [f32; 4] {
@@ -48,7 +48,8 @@ fn height_color(height: f32, slope: f32) -> [f32; 4] {
     }
 }
 
-pub fn build_terrain_mesh(heightmap: &Heightmap) -> Mesh {
+pub fn build_terrain_mesh(heightmap: &Heightmap, height_scale: f32) -> Mesh {
+    let height_mult = BASE_HEIGHT * height_scale;
     let size = heightmap.size;
     let mut positions: Vec<[f32; 3]> = Vec::with_capacity(size * size);
     let mut normals: Vec<[f32; 3]> = Vec::with_capacity(size * size);
@@ -61,7 +62,7 @@ pub fn build_terrain_mesh(heightmap: &Heightmap) -> Mesh {
         for x in 0..size {
             let h = heightmap.get(x, y);
             let px = x as f32 * TERRAIN_SCALE - half;
-            let py = h * HEIGHT_SCALE;
+            let py = h * height_mult;
             let pz = y as f32 * TERRAIN_SCALE - half;
             positions.push([px, py, pz]);
         }
@@ -75,8 +76,8 @@ pub fn build_terrain_mesh(heightmap: &Heightmap) -> Mesh {
             let hy0 = if y > 0 { heightmap.get(x, y - 1) } else { heightmap.get(x, y) };
             let hy1 = if y < size - 1 { heightmap.get(x, y + 1) } else { heightmap.get(x, y) };
 
-            let dx = (hx1 - hx0) * HEIGHT_SCALE;
-            let dy = (hy1 - hy0) * HEIGHT_SCALE;
+            let dx = (hx1 - hx0) * height_mult;
+            let dy = (hy1 - hy0) * height_mult;
             let n = Vec3::new(-dx, 2.0 * TERRAIN_SCALE, -dy).normalize();
             normals.push([n.x, n.y, n.z]);
 
@@ -114,7 +115,7 @@ mod tests {
         for v in &mut hmap.data {
             *v = 0.5;
         }
-        let mesh = build_terrain_mesh(&hmap);
+        let mesh = build_terrain_mesh(&hmap, 1.0);
         let positions = mesh.attribute(Mesh::ATTRIBUTE_POSITION).unwrap();
         assert_eq!(positions.len(), 16 * 16);
     }
@@ -122,7 +123,7 @@ mod tests {
     #[test]
     fn mesh_has_correct_index_count() {
         let hmap = Heightmap::new(16);
-        let mesh = build_terrain_mesh(&hmap);
+        let mesh = build_terrain_mesh(&hmap, 1.0);
         let idx_count = match mesh.indices().unwrap() {
             Indices::U32(v) => v.len(),
             _ => panic!("expected u32 indices"),
@@ -136,7 +137,7 @@ mod tests {
         for v in &mut hmap.data {
             *v = 0.5;
         }
-        let mesh = build_terrain_mesh(&hmap);
+        let mesh = build_terrain_mesh(&hmap, 1.0);
         if let Some(bevy::render::mesh::VertexAttributeValues::Float32x3(normals)) =
             mesh.attribute(Mesh::ATTRIBUTE_NORMAL)
         {

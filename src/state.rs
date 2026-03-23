@@ -15,6 +15,7 @@ pub struct TerrainParams {
     pub gradient_falloff: f64,
     pub dla_walkers: usize,
     pub blur_passes: usize,
+    pub height_scale: f32,
     pub dirty: bool,
 }
 
@@ -27,6 +28,7 @@ impl Default for TerrainParams {
             gradient_falloff: 1.0,
             dla_walkers: 8000,
             blur_passes: 3,
+            height_scale: 1.0,
             dirty: true,
         }
     }

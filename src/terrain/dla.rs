@@ -3,63 +3,47 @@ use rand::{Rng, SeedableRng};
 
 use super::{Heightmap, GRID_SIZE};
 
-struct DlaGrid {
-    occupied: Vec<bool>,
-    depth: Vec<u32>,
-    size: usize,
-}
+fn grow_dla(size: usize, walkers: usize, rng: &mut StdRng) -> Vec<f32> {
+    let mut occupied = vec![false; size * size];
+    let mut depth = vec![0u32; size * size];
+    let mut max_depth: u32 = 0;
 
-impl DlaGrid {
-    fn new(size: usize) -> Self {
-        Self {
-            occupied: vec![false; size * size],
-            depth: vec![0; size * size],
-            size,
-        }
-    }
+    // seed center
+    let center = (size / 2) * size + (size / 2);
+    occupied[center] = true;
+    depth[center] = 0;
 
-    fn idx(&self, x: usize, y: usize) -> usize {
-        y * self.size + x
-    }
-
-    fn set(&mut self, x: usize, y: usize, d: u32) {
-        let i = self.idx(x, y);
-        self.occupied[i] = true;
-        self.depth[i] = d;
-    }
-
-    fn has_neighbor(&self, x: usize, y: usize) -> Option<u32> {
-        let dirs: [(i32, i32); 4] = [(-1, 0), (1, 0), (0, -1), (0, 1)];
-        for (dx, dy) in dirs {
-            let nx = x as i32 + dx;
-            let ny = y as i32 + dy;
-            if nx >= 0 && nx < self.size as i32 && ny >= 0 && ny < self.size as i32 {
-                let ni = self.idx(nx as usize, ny as usize);
-                if self.occupied[ni] {
-                    return Some(self.depth[ni]);
-                }
-            }
-        }
-        None
-    }
-}
-
-fn grow_dla(size: usize, walkers: usize, rng: &mut StdRng) -> DlaGrid {
-    let mut grid = DlaGrid::new(size);
-
-    // seed the center
-    let cx = size / 2;
-    let cy = size / 2;
-    grid.set(cx, cy, 0);
+    let max_steps = size * 8;
 
     for _ in 0..walkers {
         let mut x = rng.gen_range(0..size);
         let mut y = rng.gen_range(0..size);
 
-        let max_steps = size * size;
+        if occupied[y * size + x] {
+            continue;
+        }
+
         for _ in 0..max_steps {
-            if let Some(neighbor_depth) = grid.has_neighbor(x, y) {
-                grid.set(x, y, neighbor_depth + 1);
+            let mut neighbor_depth = None;
+            for &(dx, dy) in &[(0i32, 1i32), (0, -1), (1, 0), (-1, 0)] {
+                let nx = x as i32 + dx;
+                let ny = y as i32 + dy;
+                if nx >= 0 && nx < size as i32 && ny >= 0 && ny < size as i32 {
+                    let ni = ny as usize * size + nx as usize;
+                    if occupied[ni] {
+                        neighbor_depth = Some(depth[ni]);
+                        break;
+                    }
+                }
+            }
+
+            if let Some(nd) = neighbor_depth {
+                let idx = y * size + x;
+                occupied[idx] = true;
+                depth[idx] = nd + 1;
+                if nd + 1 > max_depth {
+                    max_depth = nd + 1;
+                }
                 break;
             }
 
@@ -74,63 +58,87 @@ fn grow_dla(size: usize, walkers: usize, rng: &mut StdRng) -> DlaGrid {
         }
     }
 
-    grid
+    // root = tallest (max_depth), tips = shortest (0)
+    let md = max_depth.max(1) as f32;
+    occupied
+        .iter()
+        .zip(depth.iter())
+        .map(|(&occ, &d)| {
+            if occ {
+                (md - d as f32) / md
+            } else {
+                0.0
+            }
+        })
+        .collect()
 }
 
-fn blur_heightmap(hmap: &mut Heightmap, passes: usize) {
-    let size = hmap.size;
+fn sample(data: &[f32], size: usize, x: i32, y: i32) -> f32 {
+    let cx = x.clamp(0, size as i32 - 1) as usize;
+    let cy = y.clamp(0, size as i32 - 1) as usize;
+    data[cy * size + cx]
+}
+
+fn blur(data: &mut [f32], size: usize, passes: usize) {
     for _ in 0..passes {
-        let prev = hmap.data.clone();
-        for y in 1..size - 1 {
-            for x in 1..size - 1 {
-                let sum = prev[(y - 1) * size + x]
-                    + prev[(y + 1) * size + x]
-                    + prev[y * size + (x - 1)]
-                    + prev[y * size + (x + 1)]
-                    + prev[(y - 1) * size + (x - 1)]
-                    + prev[(y - 1) * size + (x + 1)]
-                    + prev[(y + 1) * size + (x - 1)]
-                    + prev[(y + 1) * size + (x + 1)]
-                    + prev[y * size + x];
-                hmap.data[y * size + x] = sum / 9.0;
+        let prev = data.to_owned();
+        for y in 0..size {
+            for x in 0..size {
+                let ix = x as i32;
+                let iy = y as i32;
+                let sum = sample(&prev, size, ix - 1, iy - 1)
+                    + sample(&prev, size, ix, iy - 1)
+                    + sample(&prev, size, ix + 1, iy - 1)
+                    + sample(&prev, size, ix - 1, iy)
+                    + sample(&prev, size, ix, iy)
+                    + sample(&prev, size, ix + 1, iy)
+                    + sample(&prev, size, ix - 1, iy + 1)
+                    + sample(&prev, size, ix, iy + 1)
+                    + sample(&prev, size, ix + 1, iy + 1);
+                data[y * size + x] = sum / 9.0;
             }
         }
     }
 }
 
+fn upscale(src: &[f32], src_size: usize, dst_size: usize) -> Vec<f32> {
+    let mut dst = vec![0.0; dst_size * dst_size];
+    let scale = src_size as f32 / dst_size as f32;
+
+    for dy in 0..dst_size {
+        for dx in 0..dst_size {
+            let sx = dx as f32 * scale;
+            let sy = dy as f32 * scale;
+
+            let x0 = (sx.floor() as usize).min(src_size - 1);
+            let y0 = (sy.floor() as usize).min(src_size - 1);
+            let x1 = (x0 + 1).min(src_size - 1);
+            let y1 = (y0 + 1).min(src_size - 1);
+
+            let fx = sx - x0 as f32;
+            let fy = sy - y0 as f32;
+
+            dst[dy * dst_size + dx] = src[y0 * src_size + x0] * (1.0 - fx) * (1.0 - fy)
+                + src[y0 * src_size + x1] * fx * (1.0 - fy)
+                + src[y1 * src_size + x0] * (1.0 - fx) * fy
+                + src[y1 * src_size + x1] * fx * fy;
+        }
+    }
+
+    dst
+}
+
 pub fn generate(seed: u32, walkers: usize, blur_passes: usize) -> Heightmap {
     let mut rng = StdRng::seed_from_u64(seed as u64);
 
-    // multi-resolution: start small, upscale, add detail
-    let small_size = 64;
-    let small_walkers = walkers / 4;
-    let small_grid = grow_dla(small_size, small_walkers, &mut rng);
+    let dla_size = 64;
+    let grid = grow_dla(dla_size, walkers, &mut rng);
+
+    let mut full = upscale(&grid, dla_size, GRID_SIZE);
+    blur(&mut full, GRID_SIZE, blur_passes);
 
     let mut hmap = Heightmap::new(GRID_SIZE);
-
-    // upscale the small grid's depth values into the full heightmap
-    let max_depth = small_grid.depth.iter().copied().max().unwrap_or(1).max(1) as f32;
-    for y in 0..GRID_SIZE {
-        for x in 0..GRID_SIZE {
-            let sx = x * small_size / GRID_SIZE;
-            let sy = y * small_size / GRID_SIZE;
-            let d = small_grid.depth[sy * small_size + sx] as f32;
-            hmap.set(x, y, d / max_depth);
-        }
-    }
-
-    // add fine detail at full resolution
-    let detail_grid = grow_dla(GRID_SIZE, walkers, &mut rng);
-    let detail_max = detail_grid.depth.iter().copied().max().unwrap_or(1).max(1) as f32;
-    for y in 0..GRID_SIZE {
-        for x in 0..GRID_SIZE {
-            let d = detail_grid.depth[y * GRID_SIZE + x] as f32 / detail_max;
-            let base = hmap.get(x, y);
-            hmap.set(x, y, base * 0.6 + d * 0.4);
-        }
-    }
-
-    blur_heightmap(&mut hmap, blur_passes);
+    hmap.data = full;
     hmap.normalize();
     hmap
 }
@@ -170,23 +178,69 @@ mod tests {
     }
 
     #[test]
-    fn more_blur_produces_smoother_output() {
-        let rough = generate(42, 1000, 0);
-        let smooth = generate(42, 1000, 10);
+    fn blur_reduces_roughness() {
+        let size = 32;
+        let mut raw = vec![0.0; size * size];
+        raw[(size / 2) * size + (size / 2)] = 1.0;
+        raw[(size / 2 + 1) * size + (size / 2)] = 1.0;
 
-        let roughness = |h: &Heightmap| -> f32 {
+        let mut blurred = raw.clone();
+        blur(&mut blurred, size, 5);
+
+        let roughness = |data: &[f32]| -> f32 {
             let mut total = 0.0;
-            let s = h.size;
-            for y in 1..s {
-                for x in 1..s {
-                    let dx = h.get(x, y) - h.get(x - 1, y);
-                    let dy = h.get(x, y) - h.get(x, y - 1);
+            for y in 1..size {
+                for x in 1..size {
+                    let dx = data[y * size + x] - data[y * size + (x - 1)];
+                    let dy = data[y * size + x] - data[(y - 1) * size + x];
                     total += dx.abs() + dy.abs();
                 }
             }
             total
         };
 
-        assert!(roughness(&smooth) < roughness(&rough));
+        assert!(roughness(&blurred) < roughness(&raw));
+    }
+
+    #[test]
+    fn root_is_tallest() {
+        let mut rng = StdRng::seed_from_u64(42);
+        let grid = grow_dla(32, 500, &mut rng);
+        let center = (32 / 2) * 32 + (32 / 2);
+        assert!(
+            (grid[center] - 1.0).abs() < 1e-5,
+            "root should be tallest (1.0), got {}",
+            grid[center]
+        );
+    }
+
+    #[test]
+    fn tips_are_shorter_than_root() {
+        let mut rng = StdRng::seed_from_u64(42);
+        let grid = grow_dla(32, 500, &mut rng);
+        let center = (32 / 2) * 32 + (32 / 2);
+        let root_height = grid[center];
+        let occupied_heights: Vec<f32> = grid.iter().copied().filter(|&v| v > 0.0).collect();
+        let min_occupied = occupied_heights.iter().copied().fold(f32::INFINITY, f32::min);
+        assert!(
+            min_occupied < root_height,
+            "tips ({}) should be shorter than root ({})",
+            min_occupied, root_height
+        );
+    }
+
+    #[test]
+    fn no_edge_artifacts() {
+        let hmap = generate(42, 2000, 3);
+        let s = hmap.size;
+        for x in 1..s - 1 {
+            let edge = hmap.get(x, 0);
+            let inner = hmap.get(x, 1);
+            assert!(
+                (edge - inner).abs() < 0.3,
+                "edge artifact at ({}, 0): edge={}, inner={}",
+                x, edge, inner
+            );
+        }
     }
 }
