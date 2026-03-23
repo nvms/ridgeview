@@ -9,6 +9,6 @@ repository = "https://github.com/nvms/ridgeview"
 [dependencies]
 bevy = "0.15"
 bevy_panorbit_camera = "0.22"
-bevy_egui = "0.35"
+bevy_egui = "0.33"
 noise = "0.9"
 rand = "0.8"

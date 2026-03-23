@@ -64,11 +64,11 @@ key data flow:
 
 ## dependencies
 
-- bevy: 3D rendering, window, input, ECS
-- bevy_panorbit_camera: orbit/zoom camera controls
-- bevy_egui: immediate mode UI for parameter tweaking
-- noise: perlin/simplex noise generation (noise-rs crate)
-- rand: random number generation for DLA
+- bevy 0.15: 3D rendering, window, input, ECS
+- bevy_panorbit_camera 0.22: orbit/zoom camera controls
+- bevy_egui 0.33: immediate mode UI for parameter tweaking (0.34+ requires bevy 0.16)
+- noise 0.9: perlin/simplex noise generation (noise-rs crate)
+- rand 0.8: random number generation for DLA
 
 ## workflow
 
