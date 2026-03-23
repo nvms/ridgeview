@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#111"/>
+  <polyline
+    points="60,380 130,280 180,320 240,180 300,240 360,140 420,200 460,160"
+    fill="none"
+    stroke="#7EC8A0"
+    stroke-width="8"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <polyline
+    points="60,380 130,310 180,340 240,250 300,290 360,220 420,260 460,240"
+    fill="none"
+    stroke="#5A9E7A"
+    stroke-width="5"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    opacity="0.6"
+  />
+  <polyline
+    points="60,380 130,350 180,360 240,320 300,340 360,300 420,320 460,310"
+    fill="none"
+    stroke="#3D7A5A"
+    stroke-width="3"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    opacity="0.35"
+  />
+</svg>

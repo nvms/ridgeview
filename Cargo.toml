@@ -1,0 +1,14 @@
+[package]
+name = "ridgeview"
+version = "0.1.0"
+edition = "2021"
+description = "Interactive 3D terrain generation explorer - gradient-trick and DLA mountain generation techniques"
+license = "MIT"
+repository = "https://github.com/nvms/ridgeview"
+
+[dependencies]
+bevy = "0.15"
+bevy_panorbit_camera = "0.22"
+bevy_egui = "0.35"
+noise = "0.9"
+rand = "0.8"
